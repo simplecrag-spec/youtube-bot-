@@ -476,10 +476,26 @@ async def setup_youtube_auth():
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
+    # Ensure temp directory exists
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
     return JSONResponse({
         "status": "healthy",
         "temp_dir": str(TEMP_DIR),
-        "temp_dir_exists": TEMP_DIR.exists()
+        "temp_dir_exists": TEMP_DIR.exists(),
+        "has_gemini": bool(GEMINI_API_KEY),
+        "has_youtube": bool(YOUTUBE_REFRESH_TOKEN)
+    })
+
+
+@app.get("/oauth/callback")
+async def oauth_callback(code: str = None, error: str = None):
+    """OAuth callback handler for local development."""
+    if error:
+        return JSONResponse({"error": error}, status_code=400)
+    if not code:
+        return JSONResponse({"error": "No authorization code provided"}, status_code=400)
+    return JSONResponse({
+        "message": "Authorization code received. Run setup script locally to generate refresh token."
     })
 
 
