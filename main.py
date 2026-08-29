@@ -154,7 +154,7 @@ def generate_seo_metadata(original_title: str, original_description: str = "") -
 
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-2.0-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
 
         prompt = f"""You are a YouTube SEO expert. Analyze this video and generate optimized metadata:
 
