@@ -1,184 +1,208 @@
 # YouTube Auto-Uploader
 
-A production-ready, zero-cost cloud web application that downloads videos from any link, generates SEO-optimized metadata using AI, and uploads directly to YouTube.
+AI-powered video uploader that downloads videos from any URL, generates SEO-optimized metadata using Google Gemini, and uploads to YouTube automatically.
 
 ## Features
 
-- **AI-Powered SEO**: Google Gemini generates click-worthy titles, keyword-rich descriptions, and trending tags
-- **1000+ Sites Supported**: Powered by yt-dlp (YouTube, TikTok, Instagram, Twitter, Facebook, etc.)
-- **Real-Time Progress**: WebSocket-based live status updates
-- **Zero-Cost Hosting**: Optimized for free-tier platforms (Render, Railway, Fly.io)
-- **Smart Resource Management**: Automatic cleanup of temporary files to prevent disk exhaustion
-- **Production Ready**: Full error handling, logging, and health checks
+- 🤖 **AI-Powered SEO**: Google Gemini generates optimized titles, descriptions, and tags
+- 🌐 **1000+ Sites**: Download from YouTube, TikTok, Instagram, Twitter, Facebook, and more
+- ☁️ **Zero-Cost Hosting**: Optimized for free-tier platforms (Render, Railway, Fly.io)
+- 📊 **Real-time Progress**: WebSocket-based live updates
+- 🎨 **Modern UI**: Sleek dark-mode interface with Tailwind CSS
 
-## Quick Start
+## Quick Deploy to Render
 
-### 1. Clone and Setup
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+
+### Step 1: Setup API Keys
+
+1. **Gemini API Key** (Required for AI-powered SEO)
+   - Visit: https://aistudio.google.com/app/apikey
+   - Click "Create API Key"
+   - Copy the key
+
+2. **YouTube API Credentials** (Required for uploading)
+   - Visit: https://console.cloud.google.com/apis/credentials
+   - Create a new project or select existing
+   - Enable "YouTube Data API v3"
+   - Create OAuth 2.0 credentials
+   - Add `http://localhost:8000/oauth/callback` to redirect URIs
+   - Download credentials or copy Client ID and Client Secret
+
+### Step 2: Deploy to Render
+
+1. Fork this repository to your GitHub account
+2. Go to [Render Dashboard](https://dashboard.render.com/)
+3. Click "New +" → "Web Service"
+4. Connect your forked repository
+5. Render will auto-detect `render.yaml` configuration
+6. Add environment variables:
+   - `GEMINI_API_KEY`: Your Gemini API key
+   - `YOUTUBE_CLIENT_ID`: Your YouTube client ID
+   - `YOUTUBE_CLIENT_SECRET`: Your YouTube client secret
+7. Click "Create Web Service"
+8. Wait 2-3 minutes for deployment
+
+### Step 3: Authorize YouTube
+
+1. Visit your deployed app URL (e.g., `https://your-app.onrender.com`)
+2. Run the auth setup locally first:
+   ```bash
+   python setup_youtube_auth.py
+   ```
+3. Copy the `YOUTUBE_REFRESH_TOKEN` from output
+4. Add it to Render environment variables
+5. Restart the service
+
+## Local Development
+
+### Prerequisites
+
+- Python 3.10+
+- pip
+
+### Installation
 
 ```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Clone the repository
+git clone https://github.com/simplecrag-spec/youtube-bot-.git
+cd youtube-bot-
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Copy environment template
+# Create .env file
 cp .env.example .env
+
+# Edit .env with your API keys
+# (Use nano, vim, or any text editor)
 ```
 
-### 2. Configure Environment Variables
-
-Edit `.env` and fill in your credentials:
-
-#### Google Gemini API Key (Required for SEO)
-1. Visit https://aistudio.google.com/app/apikey
-2. Create an API key
-3. Add to `.env`: `GEMINI_API_KEY=your_key_here`
-
-#### YouTube OAuth Credentials (Required for Upload)
-1. Go to https://console.cloud.google.com/apis/credentials
-2. Create a new project or select existing
-3. Enable **YouTube Data API v3**
-4. Create **OAuth 2.0 Client ID** (Desktop application)
-5. Add to `.env`:
-   ```
-   YOUTUBE_CLIENT_ID=your_client_id
-   YOUTUBE_CLIENT_SECRET=your_client_secret
-   ```
-
-### 3. Generate YouTube Refresh Token
-
-Run the setup script locally:
+### Setup YouTube Authentication
 
 ```bash
 python setup_youtube_auth.py
 ```
 
-This will open a browser for Google authorization. After authorizing, the refresh token will be added to your `.env` file.
+Follow the prompts to authorize your YouTube account. This will generate a refresh token that you'll add to your `.env` file.
 
-### 4. Run Locally
+### Run the App
 
 ```bash
 python main.py
 ```
 
-Visit http://localhost:8000
+Visit: http://localhost:8000
 
-## Deployment
+## How to Use
 
-### Option 1: Render (Recommended - Easiest)
+1. Paste any video URL (YouTube, TikTok, Instagram, etc.)
+2. Select privacy setting (Public/Unlisted/Private)
+3. Click "Process & Upload"
+4. Watch real-time progress
+5. Get your YouTube video link!
 
-1. Push code to GitHub
-2. Go to https://render.com and create account
-3. Click "New" → "Web Service"
-4. Connect your GitHub repository
-5. Configure:
-   - **Environment**: Python 3
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-   - **Plan**: Free
+## Environment Variables
 
-6. Add environment variables in Render dashboard:
-   - `GEMINI_API_KEY`
-   - `YOUTUBE_CLIENT_ID`
-   - `YOUTUBE_CLIENT_SECRET`
-   - `YOUTUBE_REFRESH_TOKEN`
-   - `APP_SECRET_KEY` (random string)
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GEMINI_API_KEY` | Yes | Google Gemini API key for SEO generation |
+| `YOUTUBE_CLIENT_ID` | Yes | YouTube OAuth client ID |
+| `YOUTUBE_CLIENT_SECRET` | Yes | YouTube OAuth client secret |
+| `YOUTUBE_REFRESH_TOKEN` | Yes | Generated from setup script |
+| `DEFAULT_PRIVACY_STATUS` | No | Default privacy (public/unlisted/private) |
+| `MAX_VIDEO_SIZE_MB` | No | Max video size in MB (default: 450) |
+| `PORT` | No | Server port (default: 8000) |
 
-7. Deploy!
+## Alternative Deployment Options
 
-### Option 2: Railway
+### Railway
 
-1. Install Railway CLI: `npm i -g @railway/cli`
-2. Login: `railway login`
-3. Initialize: `railway init`
-4. Set variables: `railway variables set GEMINI_API_KEY=your_key`
-5. Deploy: `railway up`
+```bash
+# Install Railway CLI
+npm i -g @railway/cli
 
-### Option 3: Fly.io
+# Login and deploy
+railway login
+railway init
+railway up
+```
 
-1. Install flyctl: https://fly.io/docs/hands-on/install-flyctl/
-2. Login: `fly auth login`
-3. Launch: `fly launch`
-4. Set secrets:
-   ```bash
-   fly secrets set GEMINI_API_KEY=your_key
-   fly secrets set YOUTUBE_CLIENT_ID=your_id
-   fly secrets set YOUTUBE_CLIENT_SECRET=your_secret
-   fly secrets set YOUTUBE_REFRESH_TOKEN=your_token
-   ```
-5. Deploy: `fly deploy`
+Add environment variables in Railway dashboard.
 
-## Free Tier Limits & Optimization
+### Fly.io
 
-### Resource Management
-- Uses `tempfile` for ephemeral storage
-- Automatic cleanup after upload completion
-- Maximum video size: 450MB (configurable)
-- Timeout: 30 minutes for large files
+```bash
+# Install Fly CLI
+curl -L https://fly.io/install.sh | sh
 
-### Platform Limits
-| Platform | RAM | Disk | Bandwidth |
-|----------|-----|------|-----------|
-| Render   | 512MB | Ephemeral | 100GB/mo |
-| Railway  | 512MB | 1GB | 100GB/mo |
-| Fly.io   | 256MB | 1GB | 160GB/mo |
+# Deploy
+fly launch
+fly secrets set GEMINI_API_KEY=your_key
+fly secrets set YOUTUBE_CLIENT_ID=your_id
+# ... add other secrets
+fly deploy
+```
+
+## Supported Video Sites
+
+Thanks to [yt-dlp](https://github.com/yt-dlp/yt-dlp), this app supports 1000+ sites including:
+
+- YouTube
+- TikTok
+- Instagram
+- Twitter/X
+- Facebook
+- Reddit
+- Vimeo
+- Dailymotion
+- And many more!
 
 ## API Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Web dashboard |
-| `/process` | POST | Start video processing |
-| `/status` | GET | Current processing status |
-| `/ws` | WS | Real-time updates |
-| `/health` | GET | Health check |
+- `GET /` - Main web interface
+- `POST /process` - Start video processing
+- `GET /status` - Get current processing status
+- `GET /health` - Health check
+- `WebSocket /ws` - Real-time status updates
 
 ## Project Structure
 
 ```
-youtube-auto-uploader/
-├── main.py              # FastAPI application
-├── setup_youtube_auth.py # OAuth setup helper
-├── requirements.txt     # Python dependencies
-├── Procfile            # Render deployment
-├── Dockerfile          # Container deployment
-├── .env.example        # Environment template
-├── README.md           # This file
-└── templates/
-    └── index.html      # Web UI
+youtube-bot-/
+├── main.py                 # FastAPI application
+├── setup_youtube_auth.py   # YouTube OAuth setup
+├── requirements.txt        # Python dependencies
+├── render.yaml            # Render deployment config
+├── templates/
+│   └── index.html         # Web interface
+├── .env.example           # Environment variables template
+└── README.md              # This file
 ```
 
 ## Troubleshooting
 
-### "YouTube not authenticated"
-Run `python setup_youtube_auth.py` to generate a refresh token.
+### "YouTube not authenticated" error
+- Run `python setup_youtube_auth.py` locally
+- Copy the refresh token to your environment variables
+- Restart the app
 
-### "Video too large"
-Adjust `MAX_VIDEO_SIZE_MB` in `.env` (default: 450MB).
+### "Video too large" error
+- Increase `MAX_VIDEO_SIZE_MB` environment variable
+- Free tiers usually have limited storage
 
-### "Download failed"
-- Check if the URL is valid
-- Some sites may be geo-restricted
-- Try updating yt-dlp: `pip install -U yt-dlp`
-
-### Memory Issues on Free Tier
-- Process one video at a time
-- Reduce `MAX_VIDEO_SIZE_MB`
-- The app automatically cleans up temp files
-
-## Security Notes
-
-- Never commit `.env` to version control
-- Keep `YOUTUBE_CLIENT_SECRET` private
-- The refresh token provides upload access to your YouTube channel
-- Use `APP_SECRET_KEY` for session security in production
+### "Download failed" error
+- Check if the video URL is valid
+- Some sites may require cookies or authentication
+- Private/restricted videos cannot be downloaded
 
 ## License
 
-MIT License - Use freely for personal and commercial projects.
+MIT License - feel free to use and modify!
 
-## Contributing
+## Credits
 
-Contributions welcome! Please open an issue or submit a pull request.
+- Built with [FastAPI](https://fastapi.tiangolo.com/)
+- Video downloads: [yt-dlp](https://github.com/yt-dlp/yt-dlp)
+- AI SEO: [Google Gemini](https://ai.google.dev/)
+- YouTube API: [Google APIs](https://developers.google.com/youtube)

@@ -55,3 +55,8 @@ Thumbs.db
 *.webm
 *.avi
 *.mov
+
+# YouTube credentials
+youtube_credentials.json
+token.json
+client_secret*.json
