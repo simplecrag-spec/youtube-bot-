@@ -155,16 +155,8 @@ def generate_seo_metadata(original_title: str, original_description: str = "") -
     try:
         genai.configure(api_key=GEMINI_API_KEY)
 
-        # List available models to find the right one
-        try:
-            available_models = genai.list_models()
-            model_names = [m.name for m in available_models if 'generateContent' in m.supported_generation_methods]
-            logger.info(f"Available models: {model_names}")
-            # Use the first available model
-            model_name = model_names[0] if model_names else 'models/gemini-pro'
-        except:
-            model_name = 'models/gemini-pro'
-
+        # Use the recommended latest model
+        model_name = 'models/gemini-3.6-flash'
         logger.info(f"Using model: {model_name}")
         model = genai.GenerativeModel(model_name)
 
