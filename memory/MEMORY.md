@@ -1,0 +1,1 @@
+- [YouTube Uploader Progress](youtube-uploader-progress.md) — saved all files, interrupted before auth setup
