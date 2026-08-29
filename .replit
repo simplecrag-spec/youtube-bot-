@@ -1,0 +1,36 @@
+entrypoint = "main.py"
+modules = ["python-3.10"]
+
+[nix]
+channel = "stable-23_11"
+
+[unitTest]
+language = "python3"
+
+[packager]
+language = "python3"
+
+[packager.features]
+packageSearch = true
+guessImports = true
+enableGuessImports = true
+
+[env]
+PYTHONUNBUFFERED = "1"
+PORT = "8000"
+
+[interpreter]
+command = [
+    "prybar-python310",
+    "-q",
+    "--ps1",
+    "[33m[00m ",
+    "-i"
+]
+
+[[ports]]
+express = "fastapi"
+label = "Web"
+description = "Hosts the website"
+domain = "replit"
+port = 8000
