@@ -154,7 +154,8 @@ def generate_seo_metadata(original_title: str, original_description: str = "") -
 
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-pro')
+        # Use the latest stable Gemini model
+        model = genai.GenerativeModel('gemini-1.5-pro')
 
         prompt = f"""You are a YouTube SEO expert. Analyze this video and generate optimized metadata:
 
@@ -162,9 +163,11 @@ Original Title: {original_title}
 Original Description: {original_description}
 
 Generate the following in JSON format:
-1. A click-worthy, SEO-optimized title (under 100 characters)
-2. A comprehensive description (200-300 words) with relevant hashtags
+1. A click-worthy, SEO-optimized title (under 100 characters) - Make it engaging and different from original
+2. A comprehensive description (200-300 words) with relevant hashtags and keywords
 3. A comma-separated list of 10-15 high-performing tags
+
+IMPORTANT: Create ORIGINAL content, not copies. Make titles catchy and descriptions detailed.
 
 Return ONLY valid JSON like this:
 {{
@@ -193,11 +196,11 @@ JSON:"""
         )
     except Exception as e:
         logger.error(f"Error generating SEO metadata: {e}")
-        # Fallback
+        # Fallback - create custom SEO without API
         return SEOMetadata(
-            title=original_title[:100] if original_title else "Video",
-            description=original_description or original_title or "Check out this video!",
-            tags=["video", "trending"]
+            title=f"{original_title} | Full Video",
+            description=f"Check out this amazing video!\n\n{original_description}\n\nDon't forget to like, comment, and subscribe!",
+            tags=["video", "trending", "viral", "watch"]
         )
 
 
