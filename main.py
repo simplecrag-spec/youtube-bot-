@@ -154,25 +154,34 @@ def generate_seo_metadata(original_title: str, original_description: str = "") -
 
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        # Use the latest stable Gemini model
-        model = genai.GenerativeModel('gemini-1.5-pro')
 
-        prompt = f"""You are a YouTube SEO expert. Analyze this video and generate optimized metadata:
+        # List available models to find the right one
+        try:
+            available_models = genai.list_models()
+            model_names = [m.name for m in available_models if 'generateContent' in m.supported_generation_methods]
+            logger.info(f"Available models: {model_names}")
+            # Use the first available model
+            model_name = model_names[0] if model_names else 'models/gemini-pro'
+        except:
+            model_name = 'models/gemini-pro'
+
+        logger.info(f"Using model: {model_name}")
+        model = genai.GenerativeModel(model_name)
+
+        prompt = f"""You are a YouTube SEO expert. Analyze this video and generate optimized metadata that is ORIGINAL and NOT a copy of the original.
 
 Original Title: {original_title}
 Original Description: {original_description}
 
 Generate the following in JSON format:
-1. A click-worthy, SEO-optimized title (under 100 characters) - Make it engaging and different from original
-2. A comprehensive description (200-300 words) with relevant hashtags and keywords
+1. A click-worthy, SEO-optimized title (under 100 characters) - MUST be different and engaging
+2. A comprehensive description (200-300 words) with relevant hashtags and keywords - MUST be original
 3. A comma-separated list of 10-15 high-performing tags
-
-IMPORTANT: Create ORIGINAL content, not copies. Make titles catchy and descriptions detailed.
 
 Return ONLY valid JSON like this:
 {{
-    "title": "your optimized title here",
-    "description": "your optimized description with #hashtags",
+    "title": "your ORIGINAL optimized title here",
+    "description": "your ORIGINAL optimized description with #hashtags",
     "tags": "tag1, tag2, tag3, tag4, tag5"
 }}
 
@@ -189,18 +198,27 @@ JSON:"""
 
         data = json.loads(text.strip())
 
-        return SEOMetadata(
+        result = SEOMetadata(
             title=data.get("title", original_title[:100])[:100],
             description=data.get("description", original_description),
             tags=[t.strip() for t in data.get("tags", "").split(",") if t.strip()]
         )
+        logger.info(f"SEO Generated - Title: {result.title}")
+        return result
+
     except Exception as e:
         logger.error(f"Error generating SEO metadata: {e}")
         # Fallback - create custom SEO without API
+        import random
+        prefixes = ["Ultimate", "Epic", "Amazing", "Full", "Complete", "Best", "Viral"]
+        suffixes = ["Video", "Compilation", "Highlights", "2026", "Must Watch"]
+
+        optimized_title = f"{random.choice(prefixes)} {original_title} | {random.choice(suffixes)}"[:100]
+
         return SEOMetadata(
-            title=f"{original_title} | Full Video",
-            description=f"Check out this amazing video!\n\n{original_description}\n\nDon't forget to like, comment, and subscribe!",
-            tags=["video", "trending", "viral", "watch"]
+            title=optimized_title,
+            description=f"Watch this incredible video!\n\n{original_description}\n\n✅ Don't forget to:\n- Like the video\n- Subscribe to the channel\n- Turn on notifications\n- Comment below\n\n#viral #trending #mustwatch",
+            tags=["viral", "trending", "video", "watch", "must", "incredible", "best", "2026"]
         )
 
 
