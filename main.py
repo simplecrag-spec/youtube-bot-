@@ -233,7 +233,7 @@ JSON:"""
         adjectives = ["Wait For This", "You Won't Believe", "Insane", "Crazy", "Epic", "Wild", "Unreal"]
         emojis = ["😱", "🔥", "💀", "🤯", "😂", "😮", "✅", "👀"]
 
-        optimized_title = f"{random.choice(adjectives)} {random.choice(emoji for emoji in emojis)} #Shorts #Viral"[:40]
+        optimized_title = f"{random.choice(adjectives)} {random.choice(emojis)} #Shorts #Viral"[:40]
 
         return SEOMetadata(
             title=optimized_title,
