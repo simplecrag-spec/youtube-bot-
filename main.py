@@ -232,6 +232,16 @@ def get_youtube_client(account="account1"):
     # Get refresh token for the specified account
     refresh_token = YOUTUBE_ACCOUNTS.get(account, YOUTUBE_ACCOUNTS.get("account1"))
 
+    # DIAGNOSTIC LOGGING - shows what the server actually sees
+    token_len = len(refresh_token) if refresh_token else 0
+    logger.info(f"[AUTH-DEBUG] account={account} token_present={bool(refresh_token)} token_len={token_len} "
+                f"client_id={bool(YOUTUBE_CLIENT_ID)} client_secret={bool(YOUTUBE_CLIENT_SECRET)}")
+
+    if not refresh_token:
+        logger.error(f"[AUTH-DEBUG] {account} has NO refresh token set in environment variables!")
+    elif not YOUTUBE_CLIENT_ID or not YOUTUBE_CLIENT_SECRET:
+        logger.error(f"[AUTH-DEBUG] {account} missing client_id/client_secret in environment variables!")
+
     # Try to use refresh token
     if refresh_token:
         try:
@@ -244,8 +254,9 @@ def get_youtube_client(account="account1"):
                 scopes=SCOPES
             )
             credentials.refresh(GoogleRequest())
+            logger.info(f"[AUTH-DEBUG] {account} token refresh SUCCEEDED")
         except Exception as e:
-            logger.error(f"Error refreshing token for {account}: {e}")
+            logger.error(f"[AUTH-DEBUG] {account} token refresh FAILED: {e}")
             credentials = None
 
     if not credentials:
