@@ -154,38 +154,43 @@ async def log_status(manager: ConnectionManager, status: str, progress: int, mes
 
 
 def generate_seo_metadata(original_title: str, original_description: str = "") -> SEOMetadata:
-    """Generate SEO-optimized metadata using Google Gemini AI."""
+    """Generate SEO-optimized metadata for YouTube Shorts using Google Gemini AI."""
     if not GEMINI_API_KEY:
         # Fallback to simple SEO if no API key
         return SEOMetadata(
-            title=original_title[:100] if original_title else "Video",
-            description=original_description or original_title or "Check out this video!",
-            tags=["video", "trending", "viral"]
+            title=f"{original_title[:30]} #Shorts" if original_title else "Shorts #Shorts",
+            description=f"#Shorts\n\n{original_description or original_title or 'Check out this Short!'}\n\n#Shorts #Viral #Trending",
+            tags=["shorts", "short", "viral", "trending", "ytshorts", "reels", "fyp"]
         )
 
     try:
         genai.configure(api_key=GEMINI_API_KEY)
 
-        # Use the recommended latest model
         model_name = 'models/gemini-3.6-flash'
         logger.info(f"Using model: {model_name}")
         model = genai.GenerativeModel(model_name)
 
-        prompt = f"""You are a YouTube SEO expert. Analyze this video and generate optimized metadata that is ORIGINAL and NOT a copy of the original.
+        prompt = f"""You are a YouTube Shorts SEO expert. This is a SHORT-FORM vertical video (YouTube Short).
 
 Original Title: {original_title}
 Original Description: {original_description}
 
-Generate the following in JSON format:
-1. A click-worthy, SEO-optimized title (under 100 characters) - MUST be different and engaging
-2. A comprehensive description (200-300 words) with relevant hashtags and keywords - MUST be original
-3. A comma-separated list of 10-15 high-performing tags
+Generate metadata specifically optimized for YouTube Shorts. Follow these rules STRICTLY:
+
+1. TITLE (under 40 characters): Short, punchy, curiosity-driven. MUST end with #Shorts and optionally 1 more hashtag like #Viral #FYP #Trending. Example: "Wait For The End 😱 #Shorts #Viral"
+   - Use emojis if they fit naturally
+   - Create curiosity or shock factor
+   - NO clickbait, but make people WANT to watch
+
+2. DESCRIPTION: Start with 3-5 hashtags on the FIRST line (e.g. #Shorts #Viral #Trending #FYP). Then 1-2 short sentences about the video. Keep it under 100 words total. Hashtags at the TOP, not buried.
+
+3. TAGS: 10-15 tags mixing broad and niche. Always include: shorts, short, ytshorts, viral, trending. Add niche tags relevant to the content.
 
 Return ONLY valid JSON like this:
 {{
-    "title": "your ORIGINAL optimized title here",
-    "description": "your ORIGINAL optimized description with #hashtags",
-    "tags": "tag1, tag2, tag3, tag4, tag5"
+    "title": "punchy title #Shorts #Viral",
+    "description": "#Shorts #Viral #Trending #FYP\\nShort description here.",
+    "tags": "shorts, short, viral, trending, ytshorts, fyp, niche1, niche2"
 }}
 
 JSON:"""
@@ -201,27 +206,39 @@ JSON:"""
 
         data = json.loads(text.strip())
 
-        result = SEOMetadata(
-            title=data.get("title", original_title[:100])[:100],
-            description=data.get("description", original_description),
-            tags=[t.strip() for t in data.get("tags", "").split(",") if t.strip()]
-        )
-        logger.info(f"SEO Generated - Title: {result.title}")
+        # Enforce title length and #Shorts presence
+        title = data.get("title", original_title[:30])[:40]
+        if "#shorts" not in title.lower():
+            title = f"{title} #Shorts"
+
+        # Ensure description starts with hashtags
+        description = data.get("description", original_description)
+        if not description.startswith("#"):
+            description = f"#Shorts #Viral #Trending\n\n{description}"
+
+        tags = [t.strip() for t in data.get("tags", "").split(",") if t.strip()]
+        # Always include core Shorts tags
+        for tag in ["shorts", "ytshorts", "viral"]:
+            if tag not in [t.lower() for t in tags]:
+                tags.append(tag)
+
+        result = SEOMetadata(title=title, description=description, tags=tags)
+        logger.info(f"SEO Generated (Shorts) - Title: {result.title}")
         return result
 
     except Exception as e:
         logger.error(f"Error generating SEO metadata: {e}")
-        # Fallback - create custom SEO without API
+        # Fallback - Shorts-optimized without API
         import random
-        prefixes = ["Ultimate", "Epic", "Amazing", "Full", "Complete", "Best", "Viral"]
-        suffixes = ["Video", "Compilation", "Highlights", "2026", "Must Watch"]
+        adjectives = ["Wait For This", "You Won't Believe", "Insane", "Crazy", "Epic", "Wild", "Unreal"]
+        emojis = ["😱", "🔥", "💀", "🤯", "😂", "😮", "✅", "👀"]
 
-        optimized_title = f"{random.choice(prefixes)} {original_title} | {random.choice(suffixes)}"[:100]
+        optimized_title = f"{random.choice(adjectives)} {random.choice(emoji for emoji in emojis)} #Shorts #Viral"[:40]
 
         return SEOMetadata(
             title=optimized_title,
-            description=f"Watch this incredible video!\n\n{original_description}\n\n✅ Don't forget to:\n- Like the video\n- Subscribe to the channel\n- Turn on notifications\n- Comment below\n\n#viral #trending #mustwatch",
-            tags=["viral", "trending", "video", "watch", "must", "incredible", "best", "2026"]
+            description=f"#Shorts #Viral #Trending #FYP\n\n{original_description or 'Check out this Short!'}\n\n#shorts #ytshorts #fyp",
+            tags=["shorts", "short", "viral", "trending", "ytshorts", "reels", "fyp", "shortvideo", "viralshorts", "mustwatch"]
         )
 
 
