@@ -418,7 +418,7 @@ async def home(request: Request):
     """Render the main dashboard."""
     config = {
         "has_gemini": bool(GEMINI_API_KEY),
-        "has_youtube": bool(YOUTUBE_REFRESH_TOKEN and YOUTUBE_CLIENT_ID),
+        "has_youtube": bool(YOUTUBE_REFRESH_TOKEN_ACCOUNT1 and YOUTUBE_CLIENT_ID),
         "default_privacy": DEFAULT_PRIVACY_STATUS
     }
     return templates.TemplateResponse("index.html", {"request": request, "config": config})
@@ -512,7 +512,7 @@ async def health_check():
         "temp_dir": str(TEMP_DIR),
         "temp_dir_exists": TEMP_DIR.exists(),
         "has_gemini": bool(GEMINI_API_KEY),
-        "has_youtube": bool(YOUTUBE_REFRESH_TOKEN)
+        "has_youtube": bool(YOUTUBE_REFRESH_TOKEN_ACCOUNT1)
     })
 
 
