@@ -75,7 +75,17 @@ TEMP_DIR.mkdir(exist_ok=True)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 YOUTUBE_CLIENT_ID = os.getenv("YOUTUBE_CLIENT_ID", "")
 YOUTUBE_CLIENT_SECRET = os.getenv("YOUTUBE_CLIENT_SECRET", "")
-YOUTUBE_REFRESH_TOKEN = os.getenv("YOUTUBE_REFRESH_TOKEN", "")
+
+# Support multiple YouTube accounts
+YOUTUBE_REFRESH_TOKEN_ACCOUNT1 = os.getenv("YOUTUBE_REFRESH_TOKEN", "")  # Default/Account 1
+YOUTUBE_REFRESH_TOKEN_ACCOUNT2 = os.getenv("YOUTUBE_REFRESH_TOKEN_ACCOUNT2", "")
+
+# Dictionary to hold refresh tokens for each account
+YOUTUBE_ACCOUNTS = {
+    "account1": YOUTUBE_REFRESH_TOKEN_ACCOUNT1,
+    "account2": YOUTUBE_REFRESH_TOKEN_ACCOUNT2
+}
+
 DEFAULT_PRIVACY_STATUS = os.getenv("DEFAULT_PRIVACY_STATUS", "public")
 MAX_VIDEO_SIZE_MB = int(os.getenv("MAX_VIDEO_SIZE_MB", "450"))
 PORT = int(os.getenv("PORT", "8000"))
@@ -96,6 +106,7 @@ current_process = {
 class VideoRequest(BaseModel):
     url: str
     privacy: Optional[str] = None
+    account: Optional[str] = "account1"
 
 
 class SEOMetadata(BaseModel):
@@ -214,16 +225,19 @@ JSON:"""
         )
 
 
-def get_youtube_client():
-    """Get authenticated YouTube API client."""
+def get_youtube_client(account="account1"):
+    """Get authenticated YouTube API client for specified account."""
     credentials = None
 
+    # Get refresh token for the specified account
+    refresh_token = YOUTUBE_ACCOUNTS.get(account, YOUTUBE_ACCOUNTS.get("account1"))
+
     # Try to use refresh token
-    if YOUTUBE_REFRESH_TOKEN:
+    if refresh_token:
         try:
             credentials = Credentials(
                 token=None,
-                refresh_token=YOUTUBE_REFRESH_TOKEN,
+                refresh_token=refresh_token,
                 client_id=YOUTUBE_CLIENT_ID,
                 client_secret=YOUTUBE_CLIENT_SECRET,
                 token_uri="https://oauth2.googleapis.com/token",
@@ -231,18 +245,18 @@ def get_youtube_client():
             )
             credentials.refresh(GoogleRequest())
         except Exception as e:
-            logger.error(f"Error refreshing token: {e}")
+            logger.error(f"Error refreshing token for {account}: {e}")
             credentials = None
 
     if not credentials:
-        raise Exception("YouTube not authenticated. Please run the auth setup.")
+        raise Exception(f"YouTube not authenticated for {account}. Please run the auth setup.")
 
     return build('youtube', 'v3', credentials=credentials)
 
 
-def upload_to_youtube(video_path: str, title: str, description: str, tags: list[str], privacy: str) -> str:
+def upload_to_youtube(video_path: str, title: str, description: str, tags: list[str], privacy: str, account: str = "account1") -> str:
     """Upload video to YouTube and return the video URL."""
-    youtube = get_youtube_client()
+    youtube = get_youtube_client(account)
 
     # Prepare tags as comma-separated string
     tags_str = ",".join(tags[:15])  # YouTube allows max 15 tags
@@ -274,7 +288,7 @@ def upload_to_youtube(video_path: str, title: str, description: str, tags: list[
     return f"https://www.youtube.com/watch?v={video_id}"
 
 
-async def process_video(url: str, privacy: str, background_tasks: BackgroundTasks):
+async def process_video(url: str, privacy: str, account: str = "account1", background_tasks: BackgroundTasks = None):
     """Main video processing pipeline."""
     video_path = None
 
@@ -360,7 +374,8 @@ async def process_video(url: str, privacy: str, background_tasks: BackgroundTask
             title=seo.title,
             description=seo.description,
             tags=seo.tags,
-            privacy=privacy
+            privacy=privacy,
+            account=account
         )
 
         current_process["youtube_url"] = youtube_url
@@ -435,9 +450,10 @@ async def process_video_endpoint(request: VideoRequest, background_tasks: Backgr
         return JSONResponse({"error": "URL is required"}, status_code=400)
 
     privacy = request.privacy or DEFAULT_PRIVACY_STATUS
+    account = request.account or "account1"
 
     # Run processing in background
-    background_tasks.add_task(process_video, request.url, privacy, background_tasks)
+    background_tasks.add_task(process_video, request.url, privacy, account, background_tasks)
 
     return JSONResponse({
         "status": "started",

@@ -55,20 +55,29 @@
             <!-- Input Section -->
             <div class="p-8 border-b border-gray-700">
                 <label class="block text-sm font-medium text-gray-300 mb-3">Video URL</label>
-                <div class="flex gap-3">
+                <div class="flex gap-3 mb-4">
                     <input
                         type="text"
                         id="videoUrl"
                         placeholder="Paste YouTube, TikTok, Instagram, or any video link..."
                         class="flex-1 px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-white placeholder-gray-500"
                     />
+                </div>
+                <div class="flex gap-3">
+                    <select
+                        id="accountSelect"
+                        class="px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-white"
+                    >
+                        <option value="account1">Account 1</option>
+                        <option value="account2">Account 2</option>
+                    </select>
                     <select
                         id="privacySelect"
                         class="px-4 py-3 bg-gray-900 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-white"
                     >
-                        <option value="public" {% if config.default_privacy == 'public' %}selected{% endif %}>Public</option>
-                        <option value="unlisted" {% if config.default_privacy == 'unlisted' %}selected{% endif %}>Unlisted</option>
-                        <option value="private" {% if config.default_privacy == 'private' %}selected{% endif %}>Private</option>
+                        <option value="public" {% if config.default_privacy == 'public' %}selected{% endif %}>📺 Public</option>
+                        <option value="unlisted" {% if config.default_privacy == 'unlisted' %}selected{% endif %}>🔗 Unlisted</option>
+                        <option value="private" {% if config.default_privacy == 'private' %}selected{% endif %}>🔒 Private</option>
                     </select>
                     <button
                         id="processBtn"
@@ -312,6 +321,7 @@
         async function processVideo() {
             const url = document.getElementById('videoUrl').value.trim();
             const privacy = document.getElementById('privacySelect').value;
+            const account = document.getElementById('accountSelect').value;
 
             if (!url) {
                 addLog('error', 'Please enter a video URL');
@@ -334,7 +344,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ url, privacy })
+                    body: JSON.stringify({ url, privacy, account })
                 });
 
                 const data = await response.json();
@@ -343,7 +353,7 @@
                     throw new Error(data.error || 'Failed to start processing');
                 }
 
-                addLog('info', 'Processing started...');
+                addLog('info', `Processing started for ${account}...`);
             } catch (error) {
                 addLog('error', error.message);
                 isProcessing = false;
