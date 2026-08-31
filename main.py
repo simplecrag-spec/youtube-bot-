@@ -285,7 +285,7 @@ def upload_to_youtube(video_path: str, title: str, description: str, tags: list[
             'title': title,
             'description': description,
             'tags': tags,
-            'categoryId': '22',  # People & Blogs
+            'categoryId': '24',  # Entertainment
         },
         'status': {
             'privacyStatus': privacy,
