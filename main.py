@@ -157,9 +157,8 @@ def generate_seo_metadata(original_title: str, original_description: str = "") -
     """Generate SEO-optimized metadata using Google Gemini AI."""
     if not GEMINI_API_KEY:
         # Fallback to simple SEO if no API key
-        title = f"{original_title[:92]} #Shorts" if original_title else "Video #Shorts"
         return SEOMetadata(
-            title=title,
+            title=original_title[:100] if original_title else "Video",
             description=original_description or original_title or "Check out this video!",
             tags=["video", "trending", "viral"]
         )
@@ -172,20 +171,20 @@ def generate_seo_metadata(original_title: str, original_description: str = "") -
         logger.info(f"Using model: {model_name}")
         model = genai.GenerativeModel(model_name)
 
-        prompt = f"""You are a YouTube SEO expert. Analyze this video and generate optimized metadata that is ORIGINAL and NOT a copy of the original.
+        prompt = f"""You are a YouTube SEO expert. Analyze this video and generate optimized metadata:
 
 Original Title: {original_title}
 Original Description: {original_description}
 
 Generate the following in JSON format:
-1. A click-worthy, SEO-optimized title (under 100 characters) - MUST be different and engaging
-2. A comprehensive description (200-300 words) with relevant hashtags and keywords - MUST be original
+1. A click-worthy, SEO-optimized title (under 100 characters)
+2. A comprehensive description (200-300 words) with relevant hashtags
 3. A comma-separated list of 10-15 high-performing tags
 
 Return ONLY valid JSON like this:
 {{
-    "title": "your ORIGINAL optimized title here",
-    "description": "your ORIGINAL optimized description with #hashtags",
+    "title": "your optimized title here",
+    "description": "your optimized description with #hashtags",
     "tags": "tag1, tag2, tag3, tag4, tag5"
 }}
 
@@ -202,13 +201,8 @@ JSON:"""
 
         data = json.loads(text.strip())
 
-        # Add #Shorts to title if not present, keeping under 100 characters
-        title = data.get("title", original_title[:100])[:100]
-        if "#shorts" not in title.lower():
-            title = f"{title[:92]} #Shorts"
-
         result = SEOMetadata(
-            title=title,
+            title=data.get("title", original_title[:100])[:100],
             description=data.get("description", original_description),
             tags=[t.strip() for t in data.get("tags", "").split(",") if t.strip()]
         )
@@ -217,19 +211,11 @@ JSON:"""
 
     except Exception as e:
         logger.error(f"Error generating SEO metadata: {e}")
-        # Fallback - create custom SEO without API
-        import random
-        prefixes = ["Ultimate", "Epic", "Amazing", "Full", "Complete", "Best", "Viral"]
-        suffixes = ["Video", "Compilation", "Highlights", "2026", "Must Watch"]
-
-        optimized_title = f"{random.choice(prefixes)} {original_title} | {random.choice(suffixes)}"[:100]
-        if "#shorts" not in optimized_title.lower():
-            optimized_title = f"{optimized_title[:92]} #Shorts"
-
+        # Fallback
         return SEOMetadata(
-            title=optimized_title,
-            description=f"Watch this incredible video!\n\n{original_description}\n\n✅ Don't forget to:\n- Like the video\n- Subscribe to the channel\n- Turn on notifications\n- Comment below\n\n#viral #trending #mustwatch",
-            tags=["viral", "trending", "video", "watch", "must", "incredible", "best", "2026"]
+            title=original_title[:100] if original_title else "Video",
+            description=original_description or original_title or "Check out this video!",
+            tags=["video", "trending"]
         )
 
 
@@ -285,7 +271,7 @@ def upload_to_youtube(video_path: str, title: str, description: str, tags: list[
             'title': title,
             'description': description,
             'tags': tags,
-            'categoryId': '24',  # Entertainment
+            'categoryId': '22',  # People & Blogs
         },
         'status': {
             'privacyStatus': privacy,
