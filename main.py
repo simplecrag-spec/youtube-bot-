@@ -157,8 +157,11 @@ def generate_seo_metadata(original_title: str, original_description: str = "") -
     """Generate SEO-optimized metadata using Google Gemini AI."""
     if not GEMINI_API_KEY:
         # Fallback to simple SEO if no API key
+        title = original_title[:92] if original_title else "Video"
+        if "#shorts" not in title.lower():
+            title = f"{title} #Shorts"
         return SEOMetadata(
-            title=original_title[:100] if original_title else "Video",
+            title=title,
             description=original_description or original_title or "Check out this video!",
             tags=["video", "trending", "viral"]
         )
@@ -201,8 +204,13 @@ JSON:"""
 
         data = json.loads(text.strip())
 
+        # Ensure #Shorts is in the title for Shorts content
+        title = data.get("title", original_title[:100])[:100]
+        if "#shorts" not in title.lower():
+            title = f"{title[:92]} #Shorts"
+
         result = SEOMetadata(
-            title=data.get("title", original_title[:100])[:100],
+            title=title,
             description=data.get("description", original_description),
             tags=[t.strip() for t in data.get("tags", "").split(",") if t.strip()]
         )
@@ -212,8 +220,11 @@ JSON:"""
     except Exception as e:
         logger.error(f"Error generating SEO metadata: {e}")
         # Fallback
+        title = original_title[:92] if original_title else "Video"
+        if "#shorts" not in title.lower():
+            title = f"{title} #Shorts"
         return SEOMetadata(
-            title=original_title[:100] if original_title else "Video",
+            title=title,
             description=original_description or original_title or "Check out this video!",
             tags=["video", "trending"]
         )
