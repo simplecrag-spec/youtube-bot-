@@ -154,41 +154,85 @@ async def log_status(manager: ConnectionManager, status: str, progress: int, mes
 
 
 def generate_seo_metadata(original_title: str, original_description: str = "") -> SEOMetadata:
-    """Generate SEO-optimized metadata using Google Gemini AI."""
+    """Generate viral SEO-optimized metadata using Google Gemini AI.
+    Tuned for entertainment/attraction niche YouTube Shorts."""
+
+    # Entertainment niche fallback tags — always relevant
+    NICHE_TAGS = [
+        "entertainment", "viral", "trending", "funny", "comedy",
+        "relatable", "mood", "vibes", "shorts", "fyp",
+        "mustwatch", "cantmissthis", "trending now", "explore"
+    ]
+
     if not GEMINI_API_KEY:
-        # Fallback to simple SEO if no API key
-        title = original_title[:92] if original_title else "Video"
-        if "#shorts" not in title.lower():
-            title = f"{title} #Shorts"
+        # Fallback: generate a curiosity-driven title without AI
+        import random
+        hooks = [
+            "Wait For It... 😳",
+            "Nobody Expected This 💀",
+            "I Can't Stop Watching This",
+            "Bro What 😂",
+            "This Is Too Good 🔥",
+            "You Need To See This",
+            "How Is This Even Real 😭",
+            "Main Character Energy ✨",
+            "POV: You Found The Best Video Today",
+            "This Hits Different 💯",
+        ]
+        title = random.choice(hooks)
         return SEOMetadata(
             title=title,
-            description=original_description or original_title or "Check out this video!",
-            tags=["video", "trending", "viral"]
+            description="🔥 Follow for more!\n\n#shorts #viral #trending #entertainment #fyp",
+            tags=NICHE_TAGS
         )
 
     try:
         genai.configure(api_key=GEMINI_API_KEY)
 
-        # Use the recommended latest model
         model_name = 'models/gemini-3.6-flash'
         logger.info(f"Using model: {model_name}")
         model = genai.GenerativeModel(model_name)
 
-        prompt = f"""You are a YouTube SEO expert. Analyze this video and generate optimized metadata:
+        prompt = f"""You are a YouTube Shorts VIRAL title expert for the entertainment niche.
+
+Your job: generate a SHORT, curiosity-driven, scroll-stopping title that makes people CLICK.
 
 Original Title: {original_title}
 Original Description: {original_description}
 
-Generate the following in JSON format:
-1. A click-worthy, SEO-optimized title (under 100 characters)
-2. A comprehensive description (200-300 words) with relevant hashtags
-3. A comma-separated list of 10-15 high-performing tags
+RULES FOR THE TITLE:
+- MAX 60 characters (shorter = better on Shorts)
+- Must create curiosity or FOMO ("Wait for it", "Nobody expected", "How is this real")
+- Use 1 emoji max at the end
+- NO hashtags in the title (they go in description)
+- NO "#Shorts" in the title — YouTube detects Shorts automatically
+- NO clickbait that doesn't deliver — just genuine curiosity hooks
+- Sound like a real person, not a brand
+- Examples of VIRAL titles:
+  "She Really Did That 💀"
+  "Wait For The End 😳"
+  "No Way This Is Real"
+  "POV: Main Character Moment ✨"
+  "This Hits Different 🔥"
+  "Bro Was NOT Ready 😂"
 
-Return ONLY valid JSON like this:
+RULES FOR THE DESCRIPTION:
+- MAX 3 lines total
+- Line 1: One hype sentence with 1-2 emojis
+- Line 2: "Follow for more!" or similar CTA
+- Line 3: Hashtags — include: #shorts #viral #trending #entertainment #fyp plus 3-4 relevant ones
+- NO long paragraphs, NO essays
+
+RULES FOR TAGS:
+- 12-15 tags as a comma-separated list
+- Mix of broad (viral, trending, shorts) and niche-specific tags
+- Include: shorts, viral, trending, entertainment, fyp, funny, comedy, relatable
+
+Return ONLY valid JSON:
 {{
-    "title": "your optimized title here",
-    "description": "your optimized description with #hashtags",
-    "tags": "tag1, tag2, tag3, tag4, tag5"
+    "title": "your viral title here",
+    "description": "line1\\nline2\\nline3",
+    "tags": "tag1, tag2, tag3"
 }}
 
 JSON:"""
@@ -204,29 +248,51 @@ JSON:"""
 
         data = json.loads(text.strip())
 
-        # Ensure #Shorts is in the title for Shorts content
-        title = data.get("title", original_title[:100])[:100]
-        if "#shorts" not in title.lower():
-            title = f"{title[:92]} #Shorts"
+        # Clean up the title — NO #Shorts, keep it short and punchy
+        title = data.get("title", "Wait For It... 😳")[:70]
+        # Strip any #Shorts the AI might have added anyway
+        title = title.replace("#Shorts", "").replace("#shorts", "").replace("#SHORTS", "").strip()
+
+        # Clean up description — keep it short
+        description = data.get("description", "🔥 You need to see this!\nFollow for more!\n#shorts #viral #trending #entertainment #fyp")
+
+        # Parse tags
+        tags_raw = data.get("tags", "")
+        if isinstance(tags_raw, list):
+            tags = [t.strip() for t in tags_raw if t.strip()]
+        else:
+            tags = [t.strip() for t in tags_raw.split(",") if t.strip()]
+
+        # Ensure essential tags are present
+        essential = {"shorts", "viral", "trending", "entertainment", "fyp"}
+        existing_lower = {t.lower() for t in tags}
+        for tag in essential:
+            if tag not in existing_lower:
+                tags.append(tag)
 
         result = SEOMetadata(
             title=title,
-            description=data.get("description", original_description),
-            tags=[t.strip() for t in data.get("tags", "").split(",") if t.strip()]
+            description=description,
+            tags=tags[:15]
         )
         logger.info(f"SEO Generated - Title: {result.title}")
         return result
 
     except Exception as e:
         logger.error(f"Error generating SEO metadata: {e}")
-        # Fallback
-        title = original_title[:92] if original_title else "Video"
-        if "#shorts" not in title.lower():
-            title = f"{title} #Shorts"
+        # Fallback with viral hooks
+        import random
+        hooks = [
+            "Wait For It... 😳",
+            "Nobody Expected This 💀",
+            "This Is Too Good 🔥",
+            "Bro What 😂",
+            "You Need To See This",
+        ]
         return SEOMetadata(
-            title=title,
-            description=original_description or original_title or "Check out this video!",
-            tags=["video", "trending"]
+            title=random.choice(hooks),
+            description="🔥 Follow for more!\n\n#shorts #viral #trending #entertainment #fyp",
+            tags=NICHE_TAGS
         )
 
 
@@ -282,7 +348,8 @@ def upload_to_youtube(video_path: str, title: str, description: str, tags: list[
             'title': title,
             'description': description,
             'tags': tags,
-            'categoryId': '22',  # People & Blogs
+            'categoryId': '24',  # Entertainment
+            'defaultLanguage': 'en',
         },
         'status': {
             'privacyStatus': privacy,
