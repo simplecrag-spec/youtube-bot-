@@ -11,7 +11,8 @@ import shutil
 import logging
 import tempfile
 import subprocess
-from datetime import datetime
+import asyncio
+from datetime import datetime, time as dt_time, timedelta
 from pathlib import Path
 from typing import Optional
 from contextlib import asynccontextmanager
@@ -89,6 +90,22 @@ YOUTUBE_ACCOUNTS = {
 DEFAULT_PRIVACY_STATUS = os.getenv("DEFAULT_PRIVACY_STATUS", "public")
 MAX_VIDEO_SIZE_MB = int(os.getenv("MAX_VIDEO_SIZE_MB", "450"))
 PORT = int(os.getenv("PORT", "8000"))
+
+# ── Auto-Scheduler Configuration ──────────────────────────────────────
+# Set SCHEDULER_ENABLED=true to turn on automatic scheduled uploads
+# SCHEDULER_INTERVAL_HOURS: gap between uploads (default 2 = 3/day)
+# SCHEDULER_MAX_PER_DAY: hard cap on uploads per day (default 3)
+# SCHEDULER_TIMEZONE: IANA timezone for upload scheduling (default UTC)
+SCHEDULER_ENABLED = os.getenv("SCHEDULER_ENABLED", "true").lower() in ("1", "true", "yes")
+SCHEDULER_INTERVAL_HOURS = float(os.getenv("SCHEDULER_INTERVAL_HOURS", "2"))
+SCHEDULER_MAX_PER_DAY = int(os.getenv("SCHEDULER_MAX_PER_DAY", "3"))
+SCHEDULER_TIMEZONE = os.getenv("SCHEDULER_TIMEZONE", "UTC")
+SCHEDULER_SOURCES = os.getenv("SCHEDULER_SOURCES", "").split("|")  # pipe-separated URLs
+SCHEDULER_SOURCES = [u.strip() for u in SCHEDULER_SOURCES if u.strip()]
+
+# Peak viral upload windows (hours in SCHEDULER_TIMEZONE)
+# These are the times when Shorts viewers are most active globally
+PEAK_HOURS = [12, 15, 18, 21]  # 12pm, 3pm, 6pm, 9pm
 
 # YouTube API scopes
 SCOPES = ['https://www.googleapis.com/auth/youtube.upload']
@@ -475,12 +492,158 @@ async def process_video(url: str, privacy: str, account: str = "account1", backg
             current_process["video_path"] = None
 
 
+class AutoScheduler:
+    """Automatic scheduler that uploads Shorts at peak viral times."""
+
+    def __init__(self):
+        self.sources: list[str] = list(SCHEDULER_SOURCES)
+        self.uploaded_today: int = 0
+        self.last_reset: str = datetime.now().strftime("%Y-%m-%d")
+        self._task: Optional[asyncio.Task] = None
+        self._running: bool = False
+
+    def _reset_daily_counter(self):
+        """Reset the daily upload counter if a new day has started."""
+        today = datetime.now().strftime("%Y-%m-%d")
+        if today != self.last_reset:
+            self.uploaded_today = 0
+            self.last_reset = today
+            logger.info(f"[SCHEDULER] Daily counter reset for {today}")
+
+    def _next_peak_time(self) -> float:
+        """Calculate minutes until the next peak upload window."""
+        now = datetime.now()
+        today_peaks = []
+
+        for hour in PEAK_HOURS:
+            target = now.replace(hour=hour, minute=0, second=0, microsecond=0)
+            # If target is in the past today, schedule for tomorrow
+            if target <= now:
+                from datetime import timedelta
+                target = target + timedelta(days=1)
+            today_peaks.append(target)
+
+        next_peak = min(today_peaks)
+        delta = (next_peak - now).total_seconds()
+        return max(delta / 60, 1)  # at least 1 minute
+
+    def _next_interval_time(self) -> float:
+        """Calculate minutes until the next scheduled interval upload."""
+        now = datetime.now()
+        next_time = now + timedelta(hours=SCHEDULER_INTERVAL_HOURS)
+        delta = (next_time - now).total_seconds()
+        return max(delta / 60, 1)
+
+    def _should_upload(self) -> bool:
+        """Check if we should upload based on daily cap and source availability."""
+        self._reset_daily_counter()
+        if self.uploaded_today >= SCHEDULER_MAX_PER_DAY:
+            logger.info(f"[SCHEDULER] Daily cap reached ({SCHEDULER_MAX_PER_DAY}/day)")
+            return False
+        if not self.sources:
+            logger.info("[SCHEDULER] No source URLs configured")
+            return False
+        return True
+
+    def _get_next_source(self) -> Optional[str]:
+        """Get the next source URL to upload from."""
+        if not self.sources:
+            return None
+        # Round-robin through sources
+        url = self.sources[self.uploaded_today % len(self.sources)]
+        return url
+
+    async def _do_upload(self, url: str):
+        """Execute a single scheduled upload."""
+        try:
+            logger.info(f"[SCHEDULER] Starting upload from: {url}")
+            await process_video(
+                url=url,
+                privacy=DEFAULT_PRIVACY_STATUS,
+                account="account1",
+                background_tasks=None
+            )
+            self.uploaded_today += 1
+            logger.info(f"[SCHEDULER] Upload complete. Today: {self.uploaded_today}/{SCHEDULER_MAX_PER_DAY}")
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Upload failed: {e}")
+
+    async def run(self):
+        """Main scheduler loop — runs forever."""
+        self._running = True
+        logger.info(f"[SCHEDULER] Started — interval={SCHEDULER_INTERVAL_HOURS}h, "
+                    f"max={SCHEDULER_MAX_PER_DAY}/day, sources={len(self.sources)}")
+
+        while self._running:
+            try:
+                self._reset_daily_counter()
+
+                if self._should_upload():
+                    url = self._get_next_source()
+                    if url:
+                        await self._do_upload(url)
+
+                # Wait until next interval
+                wait_minutes = self._next_interval_time()
+                logger.info(f"[SCHEDULER] Next upload in {wait_minutes:.1f} minutes")
+                await asyncio.sleep(wait_minutes * 60)
+
+            except asyncio.CancelledError:
+                logger.info("[SCHEDULER] Cancelled")
+                break
+            except Exception as e:
+                logger.error(f"[SCHEDULER] Loop error: {e}")
+                await asyncio.sleep(60)  # wait 1 min before retry
+
+    def stop(self):
+        """Stop the scheduler."""
+        self._running = False
+        if self._task and not self._task.done():
+            self._task.cancel()
+        logger.info("[SCHEDULER] Stopped")
+
+    def start(self):
+        """Start the scheduler as a background task."""
+        if self._task and not self._task.done():
+            logger.warning("[SCHEDULER] Already running")
+            return
+        self._task = asyncio.create_task(self.run())
+        logger.info("[SCHEDULER] Task created")
+
+    def status(self) -> dict:
+        """Return current scheduler status."""
+        return {
+            "enabled": SCHEDULER_ENABLED,
+            "running": self._running,
+            "interval_hours": SCHEDULER_INTERVAL_HOURS,
+            "max_per_day": SCHEDULER_MAX_PER_DAY,
+            "uploaded_today": self.uploaded_today,
+            "sources_count": len(self.sources),
+            "sources": self.sources,
+            "next_upload_in_minutes": round(self._next_interval_time(), 1) if self._running else None
+        }
+
+
+# Global scheduler instance
+scheduler = AutoScheduler()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     logger.info("Starting YouTube Auto-Uploader...")
     logger.info(f"Temporary directory: {TEMP_DIR}")
+
+    # Start the auto-scheduler if enabled
+    if SCHEDULER_ENABLED:
+        scheduler.start()
+    else:
+        logger.info("[SCHEDULER] Disabled via SCHEDULER_ENABLED env var")
+
     yield
+
+    # Cleanup on shutdown
+    scheduler.stop()
     logger.info("Shutting down...")
 
 
@@ -597,6 +760,61 @@ async def health_check():
         "has_gemini": bool(GEMINI_API_KEY),
         "has_youtube": bool(YOUTUBE_REFRESH_TOKEN_ACCOUNT1)
     })
+
+
+# ── Auto-Scheduler API Endpoints ──────────────────────────────────────
+
+@app.get("/scheduler/status")
+async def get_scheduler_status():
+    """Get current scheduler status."""
+    return JSONResponse(scheduler.status())
+
+
+@app.post("/scheduler/start")
+async def start_scheduler():
+    """Manually start the scheduler."""
+    if not SCHEDULER_ENABLED:
+        return JSONResponse({"error": "Scheduler is disabled. Set SCHEDULER_ENABLED=true"}, status_code=400)
+    scheduler.start()
+    return JSONResponse({"status": "started", "message": "Scheduler started"})
+
+
+@app.post("/scheduler/stop")
+async def stop_scheduler():
+    """Manually stop the scheduler."""
+    scheduler.stop()
+    return JSONResponse({"status": "stopped", "message": "Scheduler stopped"})
+
+
+@app.post("/scheduler/add-source")
+async def add_source(url: str):
+    """Add a video source URL to the scheduler's queue."""
+    if not url:
+        return JSONResponse({"error": "URL is required"}, status_code=400)
+    if url not in scheduler.sources:
+        scheduler.sources.append(url)
+    return JSONResponse({
+        "status": "added",
+        "sources": scheduler.sources,
+        "total_sources": len(scheduler.sources)
+    })
+
+
+@app.post("/scheduler/remove-source")
+async def remove_source(url: str):
+    """Remove a source URL from the scheduler's queue."""
+    if url in scheduler.sources:
+        scheduler.sources.remove(url)
+        return JSONResponse({"status": "removed", "sources": scheduler.sources})
+    return JSONResponse({"error": "URL not found in sources"}, status_code=404)
+
+
+@app.post("/scheduler/reset-counter")
+async def reset_counter():
+    """Reset the daily upload counter (useful for testing)."""
+    scheduler.uploaded_today = 0
+    scheduler.last_reset = datetime.now().strftime("%Y-%m-%d")
+    return JSONResponse({"status": "reset", "uploaded_today": 0})
 
 
 @app.get("/oauth/callback")
